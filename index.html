@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"><title>ChromeOS Flex App Hub</title>
+    <style>
+        body { background: #121214; color: #f1f3f4; font-family: system-ui; display: flex; height: 100vh; margin: 0; }
+        aside { width: 240px; background: #1e1e24; padding: 20px; display: flex; flex-direction: column; gap: 15px; border-right: 1px solid #3c4043; }
+        .nav-item { padding: 10px; border-radius: 6px; cursor: pointer; color: #9aa0a6; }
+        .nav-item:hover, .nav-item.active { background: #2a2b36; color: #fff; }
+        main { flex: 1; padding: 25px; overflow-y: auto; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 15px; margin-top: 20px; }
+        .card { background: #1e1e24; border: 1px solid #3c4043; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; justify-content: space-between; }
+        .btn { background: #8ab4f8; color: #202124; border: none; padding: 8px; border-radius: 6px; font-weight: bold; text-decoration: none; text-align: center; cursor: pointer; margin-top: 10px; display: block; }
+        .modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; }
+        .modal-content { background: #1e1e24; padding: 25px; border-radius: 16px; max-width: 400px; border: 1px solid #3c4043; position: relative; }
+        input, select, textarea { width: 100%; padding: 8px; margin: 5px 0 12px; background: #121214; border: 1px solid #3c4043; color: #fff; border-radius: 6px; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    <aside>
+        <h3>FlexApp Hub</h3>
+        <div class="nav-item active" onclick="filterCat('all', this)">🌐 All Apps</div>
+        <div class="nav-item" onclick="filterCat('productivity', this)">📄 Productivity</div>
+        <div class="nav-item" onclick="filterCat('entertainment', this)">🎮 Entertainment</div>
+        <div class="nav-item" onclick="filterCat('custom', this)">⭐️ Custom Apps</div>
+        <button class="btn" style="background:#81c995;" onclick="toggle('addModal', true)">+ Add App</button>
+    </aside>
+    <main>
+        <input type="text" id="search" placeholder="Search apps..." onkeyup="render()" style="width: 280px;">
+        <div id="apps" class="grid"></div>
+    </main>
+
+    <div class="modal" id="addModal" onclick="if(event.target==this) toggle('addModal', false)">
+        <div class="modal-content">
+            <h3>Add Custom PWA</h3>
+            <input type="text" id="name" placeholder="Title" required>
+            <input type="url" id="url" placeholder="https://..." required>
+            <select id="cat"><option value="productivity">Productivity</option><option value="entertainment">Entertainment</option></select>
+            <textarea id="desc" placeholder="Description"></textarea>
+            <button class="btn" style="background:#81c995;" onclick="saveApp()">Save App</button>
+        </div>
+    </div>
+
+    <div class="modal" id="instModal" onclick="if(event.target==this) toggle('instModal', false)">
+        <div class="modal-content">
+            <h3 id="m-title">Install App</h3>
+            <p style="font-size:0.9rem; color:#9aa0a6; margin:10px 0;">To run windowed: Launch, click Chrome's 3-dot menu → Save and share → Install page as app (check 'Open as window').</p>
+            <a href="#" id="m-link" target="_blank" class="btn" onclick="toggle('instModal', false)">Launch Website</a>
+        </div>
+    </div>
+
+    <script>
+        const defaults = [
+            { id: 1, name: "Photopea", category: "productivity", icon: "🎨", desc: "Photoshop web alternative.", url: "https://photopea.com" },
+            { id: 2, name: "VS Code", category: "productivity", icon: "💻", desc: "Full code editor in-browser.", url: "https://vscode.dev" },
+            { id: 3, name: "Spotify", category: "entertainment", icon: "🎵", desc: "Stream music tracks seamlessly.", url: "https://spotify.com" },
+            { id: 4, name: "GeForce NOW", category: "entertainment", icon: "🎮", desc: "Cloud PC gaming stream player.", url: "https://geforcenow.com" }
+        ];
+        let filter = 'all';
+        const toggle = (id, show) => document.getElementById(id).style.display = show ? 'flex' : 'none';
+        const getCustom = () => JSON.parse(localStorage.getItem("flex_apps")) || [];
+
+        function render() {
+            const q = document.getElementById("search").value.toLowerCase();
+            const list = [...defaults, ...getCustom().map(a => ({...a, isCustom: true}))].filter(a => 
+                (filter === 'all' || (filter === 'custom' && a.isCustom) || a.category === filter) &&
+                (a.name.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q))
+            );
+            document.getElementById("apps").innerHTML = list.map(a => `
+                <div class="card" onclick="openWizard('${a.name}', '${a.url}')">
+                    <div><h3>${a.icon||'🌐'} ${a.name}</h3><p style="font-size:0.85rem; color:#9aa0a6; margin-top:5px;">${a.desc}</p></div>
+                    <div>
+                        <a href="#" class="btn" onclick="event.stopPropagation(); openWizard('${a.name}', '${a.url}')">Get App</a>
+                        ${a.isCustom ? `<button class="btn" style="background:#f28b82; margin-top:5px;" onclick="event.stopPropagation(); delApp(\${a.id})">Delete</button>` : ''}
+                    </div>
+                </div>
+            `).join('') || '<p style="color:#9aa0a6;">No apps found.</p>';
+        }
+
+        function filterCat(cat, el) {
+            filter = cat;
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            el.classList.add('active');
+            render();
+        }
+
+        function openWizard(name, url) {
+            document.getElementById("m-title").innerText = name;
+            document.getElementById("m-link").href = url;
+            toggle('instModal', true);
+        }
+
+        function saveApp() {
+            const arr = getCustom();
+            arr.push({ id: Date.now(), name: document.getElementById("name").value, url: document.getElementById("url").value, category: document.getElementById("cat").value, desc: document.getElementById("desc").value });
+            localStorage.setItem("flex_apps", JSON.stringify(arr));
+            toggle('addModal', false);
+            render();
+        }
+
+        function delApp(id) {
+            localStorage.setItem("flex_apps", JSON.stringify(getCustom().filter(a => a.id !== id)));
+            render();
+        }
+
+        render();
+    </script>
+</body>
+</html>
