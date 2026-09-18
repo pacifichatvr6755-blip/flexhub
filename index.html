@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8"><title>ChromeOS Flex App Hub</title>
+    <meta charset="UTF-8"><title>FlexHub</title>
+    <!-- Links the manifest file needed for installation -->
+    <link rel="manifest" href="manifest.json">
     <style>
         body { background: #121214; color: #f1f3f4; font-family: system-ui; display: flex; height: 100vh; margin: 0; }
         aside { width: 240px; background: #1e1e24; padding: 20px; display: flex; flex-direction: column; gap: 15px; border-right: 1px solid #3c4043; }
@@ -12,13 +14,15 @@
         .card { background: #1e1e24; border: 1px solid #3c4043; border-radius: 12px; padding: 15px; display: flex; flex-direction: column; justify-content: space-between; }
         .btn { background: #8ab4f8; color: #202124; border: none; padding: 8px; border-radius: 6px; font-weight: bold; text-decoration: none; text-align: center; cursor: pointer; margin-top: 10px; display: block; }
         .modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); display: none; align-items: center; justify-content: center; }
-        .modal-content { background: #1e1e24; padding: 25px; border-radius: 16px; max-width: 400px; border: 1px solid #3c4043; position: relative; }
+        .modal-content { background: #1e1e24; padding: 25px; border-radius: 16px; max-width: 400px; border: 1px solid #3c4043; }
         input, select, textarea { width: 100%; padding: 8px; margin: 5px 0 12px; background: #121214; border: 1px solid #3c4043; color: #fff; border-radius: 6px; box-sizing: border-box; }
+        #installBtn { background: #c5a3ff; display: none; } /* Hidden by default until browser says it can be installed */
     </style>
 </head>
 <body>
     <aside>
-        <h3>FlexApp Hub</h3>
+        <h3>FlexHub</h3>
+        <button id="installBtn" class="btn">📥 Install FlexHub</button>
         <div class="nav-item active" onclick="filterCat('all', this)">🌐 All Apps</div>
         <div class="nav-item" onclick="filterCat('productivity', this)">📄 Productivity</div>
         <div class="nav-item" onclick="filterCat('entertainment', this)">🎮 Entertainment</div>
@@ -101,6 +105,29 @@
         function delApp(id) {
             localStorage.setItem("flex_apps", JSON.stringify(getCustom().filter(a => a.id !== id)));
             render();
+        }
+
+        // --- NATIVE PWA INSTALL LOGIC ---
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault(); // Stop Chrome from showing its own random mini-bar
+            deferredPrompt = e;  // Save the event state
+            document.getElementById('installBtn').style.display = 'block'; // Show our install button
+        });
+
+        document.getElementById('installBtn').addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt(); // Show native browser install dialog box
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                document.getElementById('installBtn').style.display = 'none';
+            }
+            deferredPrompt = null;
+        });
+
+        // Register background worker required by Chrome for validation
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => console.log(err));
         }
 
         render();
